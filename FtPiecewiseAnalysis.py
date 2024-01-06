@@ -2,12 +2,11 @@ import pandas as pd
 import numpy as np
 import piecewise_regression
 import matplotlib.pyplot as plto
-import os 
+import os
+from concurrent.futures import ThreadPoolExecutor
 
-velocitydata = pd.read_table("Velocities_25or30.txt", names=["filename", "v", "beta", "k", "bool"])
-velocitydataSize = len(velocitydata)
-for i in range(velocitydataSize):    
-    parent_dir = "./RBC data_all/" + velocitydata["filename"][i].replace("\\","/")
+def process_file(filename, k, beta):
+    parent_dir = "./RBC data_all/" + filename.replace("\\","/")
     suffix = parent_dir[15:].replace("/","_")
     directory = "Results_"+suffix
     realparent = "./GrandResults"
@@ -21,10 +20,10 @@ for i in range(velocitydataSize):
     
     #Constants and arrays to save data
     
-    beta = velocitydata["beta"][i]
-    k = velocitydata["k"][i]
-    MaxInterval = 1
-    MaxBreakpoints = 1                     # The real number of breakpoints is MAxbreakpoints-1
+    beta = beta
+    k = k
+    MaxInterval = 8
+    MaxBreakpoints = 4                     # The real number of breakpoints is MAxbreakpoints-1
     BICsList = np.zeros((MaxBreakpoints+1,MaxInterval))    # Array to save BIC
     
     alphasList0 =np.zeros((1,MaxInterval))
@@ -39,7 +38,7 @@ for i in range(velocitydataSize):
     breakpointsList3 = np.zeros((4,MaxInterval))    # Array to save Breakpoints
     
     # Reading Data and storing the columns of data frame into arrays
-    
+    print("opened_: "+filename)
     d = pd.read_table(parent_dir + "/StretchingA 0unaveraged.txt", names=["v_x", "v_y", "v_z", "v_piezo"])
     dataSize = len(d)
     lastT = dataSize*0.0002 
@@ -218,3 +217,19 @@ for i in range(velocitydataSize):
     dataAlphas3.to_csv(path2+'/Alphas3.tsv', sep="\t")               
     dataBreakpoints3.to_csv(path2+'/Breakpoints3.tsv', sep="\t")
     
+
+
+velocitydata = pd.read_table("Velocities_25or30.txt", names=["filename", "v", "beta", "k", "bool"])
+velocitydataSize = len(velocitydata)
+
+# Number of threads (adjust based on available resources)
+num_threads = 25
+
+with ThreadPoolExecutor(max_workers=num_threads) as executor:
+    # Submit tasks to the executor
+    futures = [executor.submit(process_file, velocitydata["filename"][i], velocitydata["k"][i], velocitydata["beta"][i]) for i in range(1,velocitydataSize)]
+    # Wait for all tasks to complete
+    for future in futures:
+        future.result()
+
+print("All files processed.")
